@@ -691,6 +691,8 @@ public class SharedConfig {
     // the pack is missing. Global because the emoji bitmap cache (Emoji.emojiBmp)
     // is a process-wide static, same as useSystemFont/useSystemEmoji.
     public static boolean mg_useCustomEmojiPack = false;
+    /** Global media quality: 0 Low, 1 Balanced, 2 High, 3 Original. */
+    public static int mg_mediaQuality = 1;
 
     // Mercurygram: Privacy
     public static boolean reduceTrackingFingerprint = false;
@@ -1043,6 +1045,7 @@ public class SharedConfig {
         editor.putString("mg_transcribeModel", mg_transcribeModel);
         editor.putBoolean("mg_transcribeVad", mg_transcribeVad);
         editor.putBoolean("mg_useCustomEmojiPack", mg_useCustomEmojiPack);
+        editor.putInt("mg_mediaQuality", mg_mediaQuality);
         editor.putString("mg_webPushPrivateKey", webPushPrivateKey != null ? Base64.encodeToString(webPushPrivateKey, Base64.DEFAULT) : "");
         editor.putString("mg_webPushPublicKey", webPushPublicKey != null ? Base64.encodeToString(webPushPublicKey, Base64.DEFAULT) : "");
         editor.putString("mg_webPushAuthSecret", webPushAuthSecret != null ? Base64.encodeToString(webPushAuthSecret, Base64.DEFAULT) : "");
@@ -1098,6 +1101,7 @@ public class SharedConfig {
         mg_transcribeModel = preferences.getString("mg_transcribeModel", "tiny-q8_0");
         mg_transcribeVad = preferences.getBoolean("mg_transcribeVad", true);
         mg_useCustomEmojiPack = preferences.getBoolean("mg_useCustomEmojiPack", false);
+        mg_mediaQuality = Math.max(0, Math.min(3, preferences.getInt("mg_mediaQuality", 1)));
         migratePerAccountSettingsV1(preferences);
         migrateTranscribeLangToPerAccount(preferences);
         migrateHideStoriesToPerAccount(preferences);

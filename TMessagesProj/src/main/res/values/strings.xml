@@ -3606,6 +3606,11 @@
     <string name="LoginOrSingInWithGoogle">or</string>
     <!--data settings-->
     <string name="DataSettings">Data and Storage</string>
+    <string name="MediaQualitySettingTitle">Atur kualitas foto dan video yang diunduh, diputar, dan disimpan ke galeri</string>
+    <string name="MediaQualitySettingLow">Low — SD</string>
+    <string name="MediaQualitySettingBalanced">Balanced — HD</string>
+    <string name="MediaQualitySettingHigh">High — FHD</string>
+    <string name="MediaQualitySettingOriginal">Original — Mengikuti kualitas asli foto dan video</string>
     <string name="DataUsage">Disk and network usage</string>
     <string name="StorageUsage">Storage Usage</string>
     <string name="StorageCleared">Storage Cleared</string>

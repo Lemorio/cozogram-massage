@@ -35,6 +35,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SaveToGallerySettingsHelper;
 import org.telegram.messenger.SharedConfig;
+import it.belloworld.mercurygram.helpers.MediaQualityHelper;
 import org.telegram.messenger.StatsController;
 import org.telegram.messenger.voip.Instance;
 import org.telegram.tgnet.TLRPC;
@@ -104,6 +105,7 @@ public class DataSettingsActivity extends BaseFragment {
     @Keep
     private int clearDraftsRow;
     private int clearDraftsSectionRow;
+    private int mediaQualityRow;
     private int saveToGallerySectionRow;
     @Keep
     private int saveToGalleryPeerRow;
@@ -167,6 +169,7 @@ public class DataSettingsActivity extends BaseFragment {
             }
         }
         mediaDownloadSection2Row = rowCount++;
+        mediaQualityRow = rowCount++;
 
         saveToGallerySectionRow = rowCount++;
         saveToGalleryPeerRow = rowCount++;
@@ -299,7 +302,9 @@ public class DataSettingsActivity extends BaseFragment {
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT));
         listView.setAdapter(listAdapter);
         listView.setOnItemClickListener((view, position, x, y) -> {
-            if (position == saveToGalleryGroupsRow || position == saveToGalleryChannelsRow || position == saveToGalleryPeerRow) {
+            if (position == mediaQualityRow) {
+                showMediaQualityDialog();
+            } else if (position == saveToGalleryGroupsRow || position == saveToGalleryChannelsRow || position == saveToGalleryPeerRow) {
                 int flag;
                 if (position == saveToGalleryGroupsRow) {
                     flag = SharedConfig.SAVE_TO_GALLERY_FLAG_GROUP;
@@ -605,6 +610,39 @@ public class DataSettingsActivity extends BaseFragment {
         return fragmentView;
     }
 
+    private void showMediaQualityDialog() {
+        CharSequence[] options = new CharSequence[]{
+                LocaleController.getString(R.string.MediaQualitySettingLow),
+                LocaleController.getString(R.string.MediaQualitySettingBalanced),
+                LocaleController.getString(R.string.MediaQualitySettingHigh),
+                LocaleController.getString(R.string.MediaQualitySettingOriginal)
+        };
+        AlertDialog dialog = new AlertDialog.Builder(getParentActivity())
+                .setTitle(LocaleController.getString(R.string.MediaQualitySettingTitle))
+                .setItems(options, (dialogInterface, which) -> {
+                    MediaQualityHelper.setQuality(which);
+                    SharedConfig.saveConfig();
+                    dialogInterface.dismiss();
+                    rebind(mediaQualityRow);
+                })
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .create();
+        showDialog(dialog);
+    }
+
+    private String mediaQualityLabel() {
+        switch (MediaQualityHelper.getQuality()) {
+            case MediaQualityHelper.LOW:
+                return LocaleController.getString(R.string.MediaQualitySettingLow);
+            case MediaQualityHelper.HIGH:
+                return LocaleController.getString(R.string.MediaQualitySettingHigh);
+            case MediaQualityHelper.ORIGINAL:
+                return LocaleController.getString(R.string.MediaQualitySettingOriginal);
+            default:
+                return LocaleController.getString(R.string.MediaQualitySettingBalanced);
+        }
+    }
+
     private void setStorageDirectory(String storageDir) {
         SharedConfig.storageCacheDir = storageDir;
         SharedConfig.saveConfig();
@@ -715,6 +753,9 @@ public class DataSettingsActivity extends BaseFragment {
                     } else if (position == proxyRow) {
                         textCell.setIcon(0);
                         textCell.setText(LocaleController.getString(R.string.ProxySettings), false);
+                    } else if (position == mediaQualityRow) {
+                        textCell.setIcon(0);
+                        textCell.setTextAndValue(LocaleController.getString(R.string.MediaQualitySettingTitle), mediaQualityLabel(), true, false);
                     } else if (position == resetDownloadRow) {
                         textCell.setIcon(0);
                         textCell.setCanDisable(true);
@@ -885,7 +926,7 @@ public class DataSettingsActivity extends BaseFragment {
         public boolean isRowEnabled(int position) {
             return position == mobileRow || position == roamingRow || position == wifiRow || position == storageUsageRow || position == useLessDataForCallsRow || position == dataUsageRow || position == proxyRow || position == clearDraftsRow ||
                     position == enableCacheStreamRow || position == enableStreamRow || position == enableAllStreamRow || position == enableMkvRow || position == quickRepliesRow || position == autoplayVideoRow || position == autoplayGifsRow ||
-                    position == storageNumRow || position == saveToGalleryGroupsRow || position == saveToGalleryPeerRow || position == saveToGalleryChannelsRow || position == resetDownloadRow;
+                    position == storageNumRow || position == mediaQualityRow || position == saveToGalleryGroupsRow || position == saveToGalleryPeerRow || position == saveToGalleryChannelsRow || position == resetDownloadRow;
         }
 
         @Override
