@@ -94,7 +94,6 @@ public class MercurygramSettingsActivity extends UniversalFragment {
     private static final int ID_MUTE_ALL_LOCALLY = 71;
     private static final int ID_PRIORITIZE_NETWORK_DURING_CALL = 72;
     private static final int ID_CALL_NETWORK_RESTRICTION_MODE = 73;
-    private static final int ID_MEDIA_DOWNLOADS = 74;
 
     @Override
     protected CharSequence getTitle() {
@@ -195,10 +194,6 @@ public class MercurygramSettingsActivity extends UniversalFragment {
                         LocaleController.getString(R.string.MuteAllLocally))
                 .setChecked(getUserConfig().mg.muteAllLocally));
         items.add(UItem.asShadow(LocaleController.getString(R.string.MuteAllLocallyAbout)));
-        items.add(UItem.asButton(ID_MEDIA_DOWNLOADS,
-                        LocaleController.getString(R.string.MediaDownloads),
-                        LocaleController.getString(R.string.MediaDownloadsAbout)));
-
         items.add(UItem.asHeader(LocaleController.getString(R.string.MercurygramSettingsMedia)));
         items.add(UItem.asCheck(ID_AUTO_REVEAL_SPOILERS,
                         LocaleController.getString(R.string.AutoRevealSpoilers))
@@ -491,9 +486,6 @@ public class MercurygramSettingsActivity extends UniversalFragment {
                 getUserConfig().mg.muteAllLocally = !getUserConfig().mg.muteAllLocally;
                 getUserConfig().saveConfig(false);
                 refreshList();
-                break;
-            case ID_MEDIA_DOWNLOADS:
-                presentFragment(new MediaDownloadSettingsActivity());
                 break;
             case ID_SEND_LARGE_PHOTOS:
                 getUserConfig().mg.sendLargePhotos = !getUserConfig().mg.sendLargePhotos;
