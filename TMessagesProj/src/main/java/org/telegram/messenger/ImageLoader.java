@@ -46,6 +46,8 @@ import org.telegram.DispatchQueuePriority;
 import org.telegram.messenger.secretmedia.EncryptedFileInputStream;
 import org.telegram.messenger.utils.BitmapsCache;
 import org.telegram.messenger.wallpaper.WallpaperGiftBitmapDrawable;
+import it.belloworld.mercurygram.helpers.MediaQualityHelper;
+import it.belloworld.mercurygram.helpers.MediaQualityTranscoder;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
@@ -2225,7 +2227,16 @@ public class ImageLoader {
                                     }
                                 }
                                 if (SaveToGallerySettingsHelper.needSave(flag, meta, messageObject, currentAccount)) {
-                                    AndroidUtilities.addMediaToGallery(finalFile.toString());
+                                    if (messageObject != null && messageObject.isVideo()
+                                            && !MediaQualityTranscoder.isProcessedVideoFile(finalFile)
+                                            && MediaQualityHelper.getQuality() != MediaQualityHelper.ORIGINAL) {
+                                        final int selectedQuality = MediaQualityHelper.getQuality();
+                                        MediaQualityTranscoder.processAsync(finalFile, selectedQuality, (galleryFile, processed) ->
+                                                AndroidUtilities.runOnUIThread(() -> AndroidUtilities.addMediaToGallery(
+                                                        (galleryFile != null ? galleryFile : finalFile).toString())));
+                                    } else {
+                                        AndroidUtilities.addMediaToGallery(finalFile.toString());
+                                    }
                                 }
                             }
                         }

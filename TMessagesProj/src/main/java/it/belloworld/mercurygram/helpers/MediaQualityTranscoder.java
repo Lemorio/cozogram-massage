@@ -8,17 +8,41 @@ import org.telegram.messenger.VideoEditedInfo;
 import org.telegram.messenger.video.MediaCodecVideoConvertor;
 
 import java.io.File;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Local video quality processor. All conversion work is posted to the global
  * worker queue; callers must not invoke the converter from the UI thread.
  */
 public final class MediaQualityTranscoder {
+    private static final ConcurrentHashMap<String, Boolean> inFlight = new ConcurrentHashMap<>();
     public interface Callback {
         void onComplete(File output, boolean processed);
     }
 
     private MediaQualityTranscoder() {
+    }
+
+    public static int getVideoHeight(File source) {
+        if (source == null || !source.isFile()) {
+            return 0;
+        }
+        MediaMetadataRetriever metadata = new MediaMetadataRetriever();
+        try {
+            metadata.setDataSource(source.getAbsolutePath());
+            return parseInt(metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT), 0);
+        } catch (Throwable ignored) {
+            return 0;
+        } finally {
+            try {
+                metadata.release();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    public static boolean isProcessedVideoFile(File file) {
+        return file != null && file.getName().contains(".mgq");
     }
 
     public static void processAsync(final File source, final int quality, final Callback callback) {
@@ -35,10 +59,18 @@ public final class MediaQualityTranscoder {
             notifyComplete(callback, output, true);
             return;
         }
+        final String jobKey = source.getAbsolutePath() + "#" + MediaQualityHelper.clamp(quality);
+        if (inFlight.putIfAbsent(jobKey, Boolean.TRUE) != null) {
+            return;
+        }
 
         org.telegram.messenger.Utilities.globalQueue.postRunnable(() -> {
-            File result = transcode(source, output, quality);
-            notifyComplete(callback, result != null ? result : source, result != null);
+            try {
+                File result = transcode(source, output, quality);
+                notifyComplete(callback, result != null ? result : source, result != null);
+            } finally {
+                inFlight.remove(jobKey);
+            }
         });
     }
 

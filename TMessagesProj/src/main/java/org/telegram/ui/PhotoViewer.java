@@ -153,6 +153,7 @@ import com.google.android.exoplayer2.video.VideoSize;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import it.belloworld.mercurygram.helpers.MediaQualityHelper;
+import it.belloworld.mercurygram.helpers.MediaQualityTranscoder;
 import org.telegram.messenger.AnimationNotificationsLocker;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.Bitmaps;
@@ -10319,6 +10320,24 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
     }
 
     private void preparePlayer(ArrayList<VideoPlayer.Quality> videoUrises, Uri uri, boolean playWhenReady, boolean preview, MediaController.SavedFilterState savedFilterState, boolean livePhoto, long videoByteOffset) {
+        if (!preview && currentMessageObject != null && currentMessageObject.isVideo() && uri != null && "file".equals(uri.getScheme())) {
+            final File sourceFile = new File(uri.getPath());
+            final int selectedQuality = org.telegram.messenger.SharedConfig.mg_mediaQuality;
+            final int sourceHeight = MediaQualityTranscoder.getVideoHeight(sourceFile);
+            if (!MediaQualityTranscoder.isProcessedVideoFile(sourceFile)
+                    && MediaQualityHelper.shouldTranscodeVideo(sourceHeight, selectedQuality)) {
+                final MessageObject playbackMessage = currentMessageObject;
+                MediaQualityTranscoder.processAsync(sourceFile, selectedQuality, (processed, isProcessed) -> {
+                    if (isProcessed && processed != null && playbackMessage == currentMessageObject) {
+                        AndroidUtilities.runOnUIThread(() -> {
+                            if (playbackMessage == currentMessageObject) {
+                                preparePlayer(null, Uri.fromFile(processed), playWhenReady, false, savedFilterState, livePhoto, videoByteOffset);
+                            }
+                        });
+                    }
+                });
+            }
+        }
         if (!preview) {
             currentPlayingVideoFile = uri;
             currentPlayingVideoQualityFiles = videoUrises;
