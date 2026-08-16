@@ -2,10 +2,13 @@ package it.belloworld.mercurygram.helpers;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.ui.Components.VideoPlayer;
 import org.telegram.messenger.Utilities;
 
 import java.io.File;
@@ -23,7 +26,7 @@ public final class MediaQualityPipeline {
     private MediaQualityPipeline() {
     }
 
-    public static void requestAfterDownload(int account, String fileName, boolean video, int quality, Callback callback) {
+    public static void requestAfterDownload(int account, String fileName, boolean video, int quality, MessageObject messageObject, Callback callback) {
         if (fileName == null || quality == MediaQualityHelper.ORIGINAL) {
             return;
         }
@@ -35,10 +38,34 @@ public final class MediaQualityPipeline {
                 }
                 NotificationCenter.getInstance(account).removeObserver(this, NotificationCenter.fileLoaded);
                 File source = args[1] instanceof File ? (File) args[1] : null;
-                request(source, video, quality, callback);
+                if (messageObject != null) {
+                    requestForMessage(source, video, quality, messageObject, callback);
+                } else {
+                    request(source, video, quality, callback);
+                }
             }
         };
         NotificationCenter.getInstance(account).addObserver(observer, NotificationCenter.fileLoaded);
+    }
+
+    public static void requestForMessage(File source, boolean video, int quality, MessageObject messageObject, Callback callback) {
+        request(source, video, quality, (file, processed) -> {
+            if (processed && file != null && messageObject != null && video) {
+                VideoPlayer.VideoUri local = new VideoPlayer.VideoUri();
+                local.currentAccount = messageObject.currentAccount;
+                local.original = false;
+                local.uri = Uri.fromFile(file);
+                local.size = file.length();
+                local.duration = messageObject.getDuration();
+                local.height = MediaQualityHelper.getVideoTargetHeight(quality);
+                local.width = 0;
+                messageObject.cachedQuality = local;
+                NotificationCenter.getInstance(messageObject.currentAccount).postNotificationName(NotificationCenter.updateInterfaces, 0);
+            }
+            if (callback != null) {
+                callback.onComplete(file, processed);
+            }
+        });
     }
 
     public static void request(File source, boolean video, int quality, Callback callback) {

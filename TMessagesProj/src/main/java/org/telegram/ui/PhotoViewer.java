@@ -10694,11 +10694,15 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 }
             }
 
-            if (videoUrises != null) {
-                                        VideoPlayer.Quality globalQuality = MediaQualityHelper.selectVideoQuality(videoUrises, org.telegram.messenger.SharedConfig.mg_mediaQuality);
-                        videoPlayer.preparePlayer(videoUrises, globalQuality != null ? globalQuality : VideoPlayer.getSavedQuality(videoUrises, currentMessageObject));
-
+                        if (currentMessageObject != null && currentMessageObject.cachedQuality != null
+                    && currentMessageObject.cachedQuality.isCached()
+                    && org.telegram.messenger.SharedConfig.mg_mediaQuality != MediaQualityHelper.ORIGINAL) {
+                videoPlayer.preparePlayer(currentMessageObject.cachedQuality.uri, "other", FileLoader.PRIORITY_HIGH, videoByteOffset);
+            } else if (videoUrises != null) {
+                VideoPlayer.Quality globalQuality = MediaQualityHelper.selectVideoQuality(videoUrises, org.telegram.messenger.SharedConfig.mg_mediaQuality);
+                videoPlayer.preparePlayer(videoUrises, globalQuality != null ? globalQuality : VideoPlayer.getSavedQuality(videoUrises, currentMessageObject));
             } else {
+
                 videoPlayer.preparePlayer(uri, "other", FileLoader.PRIORITY_HIGH, videoByteOffset);
             }
             if (videoPlayer.player != null) {

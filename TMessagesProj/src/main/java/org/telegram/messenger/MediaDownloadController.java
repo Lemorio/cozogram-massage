@@ -211,7 +211,7 @@ public final class MediaDownloadController {
             VideoPlayer.VideoUri uri = videoQuality.getDownloadUri();
             if (uri != null && uri.document != null) {
                 String fileName = FileLoader.getAttachFileName(uri.document);
-                MediaQualityPipeline.requestAfterDownload(messageObject.currentAccount, fileName, true, quality, null);
+                MediaQualityPipeline.requestAfterDownload(messageObject.currentAccount, fileName, true, quality, messageObject, null);
                 FileLoader.getInstance(messageObject.currentAccount).loadFile(
                         uri.document, messageObject, FileLoader.PRIORITY_NORMAL_UP, 0);
             }
@@ -222,7 +222,7 @@ public final class MediaDownloadController {
             ImageLocation location = ImageLocation.getForPhoto(photoSize, photo);
             if (location != null) {
                 String fileName = FileLoader.getAttachFileName(photoSize);
-                MediaQualityPipeline.requestAfterDownload(messageObject.currentAccount, fileName, false, quality, null);
+                MediaQualityPipeline.requestAfterDownload(messageObject.currentAccount, fileName, false, quality, messageObject, null);
                 FileLoader.getInstance(messageObject.currentAccount).loadFile(
                         location, messageObject, null, FileLoader.PRIORITY_NORMAL_UP, 0);
             }
