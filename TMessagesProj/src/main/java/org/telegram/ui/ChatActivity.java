@@ -166,6 +166,7 @@ import org.telegram.messenger.LanguageDetector;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
+import org.telegram.messenger.MediaDownloadController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagePreviewParams;
@@ -293,6 +294,7 @@ import org.telegram.ui.Components.poll.PollAttachedMediaPack;
 import org.telegram.ui.Components.poll.PollSendParams;
 import org.telegram.ui.Components.poll.PollUtils;
 import org.telegram.ui.Components.poll.sheets.PollStatisticsBottomSheet;
+import org.telegram.messenger.QuickSaveController;
 import org.telegram.ui.Components.quickforward.QuickShareSelectorOverlayLayout;
 import org.telegram.ui.Components.spoilers.SpoilerEffect;
 import org.telegram.ui.Components.voip.CellFlickerDrawable;
@@ -1242,6 +1244,9 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_SUGGESTION_ADD_OFFER = 114;
 
     public final static int OPTION_VIEW_STATISTICS = 115;
+    public final static int OPTION_QUICK_SAVE = 116;
+    public final static int OPTION_DOWNLOAD_MEDIA = 117;
+    public final static int OPTION_DOWNLOAD_MEDIA_AS = 118;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -33203,6 +33208,30 @@ public class ChatActivity extends BaseFragment implements
         MediaController.saveFile(path, getParentActivity(), messageObject.isVideo() ? 1 : 0, null, null);
     }
 
+        private void quickSaveMessageToSavedMessages() {
+        if (selectedObject == null || getParentActivity() == null) {
+            return;
+        }
+        final ArrayList<MessageObject> messagesToSave = QuickSaveController.resolveMessages(selectedObject, selectedObjectGroup);
+        final long savedMessagesDialogId = getUserConfig().getClientUserId();
+        QuickSaveController.save(currentAccount, messagesToSave, savedMessagesDialogId, new QuickSaveController.Callback() {
+            @Override
+            public void onSaved(int messageCount) {
+                BulletinFactory.createForwardedBulletin(
+                    getContext(), ChatActivity.this, null, 1, savedMessagesDialogId, messageCount,
+                    getThemedColor(Theme.key_undo_background), getThemedColor(Theme.key_undo_infoColor),
+                    Bulletin.DURATION_PROLONG
+                ).show();
+            }
+
+            @Override
+            public void onError(int result) {
+                AlertsCreator.showSendMediaAlert(result, ChatActivity.this, resourceProvider);
+            }
+        });
+    }
+
+
     private void processSelectedOption(int option) {
         if (selectedObject == null || getParentActivity() == null) {
             return;
@@ -33232,6 +33261,10 @@ public class ChatActivity extends BaseFragment implements
                         }
                     }
                 });
+                break;
+            }
+            case OPTION_QUICK_SAVE: {
+                quickSaveMessageToSavedMessages();
                 break;
             }
             case OPTION_DELETE: {
@@ -33543,6 +33576,19 @@ public class ChatActivity extends BaseFragment implements
                 alert.setDimBehind(false);
                 alert.setOnDismissListener(() -> dimBehindView(false));
                 showDialog(alert);
+                break;
+            }
+            case OPTION_DOWNLOAD_MEDIA:
+            case OPTION_DOWNLOAD_MEDIA_AS: {
+                if (selectedObject != null) {
+                    MediaDownloadController.Callback callback = (messageObject, videoQuality, photoSize) ->
+                            MediaDownloadController.downloadSelected(messageObject, videoQuality, photoSize);
+                    if (option == OPTION_DOWNLOAD_MEDIA_AS) {
+                        MediaDownloadController.chooseAs(getParentActivity(), selectedObject, callback);
+                    } else {
+                        MediaDownloadController.chooseOrDownload(getParentActivity(), selectedObject, callback);
+                    }
+                }
                 break;
             }
             case OPTION_SAVE_TO_DOWNLOADS_OR_MUSIC: {
@@ -39137,6 +39183,36 @@ public class ChatActivity extends BaseFragment implements
             );
 
             return bulletin.allowBlur().show(bulletin.getLayout() instanceof Bulletin.LottieLayoutWithReactions);
+        }
+
+        @Override
+        public boolean didLongPressSideButton(ChatMessageCell cell) {
+            if (getUserConfig().mg.quickSaveSideButtonEnabled
+                    && getUserConfig().mg.quickSavePresentationMode == 0
+                    && cell != null && cell.getMessageObject() != null) {
+                final MessageObject messageObject = cell.getMessageObject();
+                final MessageObject.GroupedMessages group = messageObject.getGroupId() != 0
+                        ? groupedMessagesMap.get(messageObject.getGroupId()) : null;
+                final ArrayList<MessageObject> messagesToSave = QuickSaveController.resolveMessages(messageObject, group);
+                final long savedMessagesDialogId = getUserConfig().getClientUserId();
+                QuickSaveController.save(currentAccount, messagesToSave, savedMessagesDialogId, new QuickSaveController.Callback() {
+                    @Override
+                    public void onSaved(int messageCount) {
+                        BulletinFactory.createForwardedBulletin(
+                            getContext(), ChatActivity.this, null, 1, savedMessagesDialogId, messageCount,
+                            getThemedColor(Theme.key_undo_background), getThemedColor(Theme.key_undo_infoColor),
+                            Bulletin.DURATION_PROLONG
+                        ).show();
+                    }
+
+                    @Override
+                    public void onError(int result) {
+                        AlertsCreator.showSendMediaAlert(result, ChatActivity.this, resourceProvider);
+                    }
+                });
+                return true;
+            }
+            return false;
         }
 
         @Override
@@ -45905,9 +45981,20 @@ public class ChatActivity extends BaseFragment implements
                     !selectedObject.isLiveLocation() && selectedObject.type != MessageObject.TYPE_PHONE_CALL && !noforwards && selectedObject.type != MessageObject.TYPE_SHARING_OFFER &&
                     selectedObject.type != MessageObject.TYPE_GIFT_PREMIUM && selectedObject.type != MessageObject.TYPE_GIFT_OFFER && selectedObject.type != MessageObject.TYPE_COMMUNITY_CHANGED && selectedObject.type != MessageObject.TYPE_GIFT_OFFER_REJECTED && selectedObject.type != MessageObject.TYPE_GIFT_PREMIUM_CHANNEL && selectedObject.type != MessageObject.TYPE_SUGGEST_PHOTO && !selectedObject.isWallpaperAction()
                     && !message.isExpiredStory() && message.type != MessageObject.TYPE_STORY_MENTION && message.type != MessageObject.TYPE_GIFT_STARS) {
+                    if ((selectedObject.isVideo() || selectedObject.isPhoto()) && !selectedObject.mediaExists()) {
+                        items.add(LocaleController.getString(R.string.MediaDownloadsDownloadMedia));
+                        options.add(OPTION_DOWNLOAD_MEDIA);
+                        icons.add(R.drawable.msg_download);
+                        items.add(LocaleController.getString(R.string.MediaDownloadsDownloadAs));
+                        options.add(OPTION_DOWNLOAD_MEDIA_AS);
+                        icons.add(R.drawable.msg_download);
+                    }
                     items.add(LocaleController.getString(R.string.Forward));
                     options.add(OPTION_FORWARD);
                     icons.add(R.drawable.msg_forward);
+                    items.add(LocaleController.getString(R.string.QuickSave));
+                    options.add(OPTION_QUICK_SAVE);
+                    icons.add(R.drawable.msg_fave);
                 }
                 if (allowUnpin) {
                     items.add(LocaleController.getString(R.string.UnpinMessage));

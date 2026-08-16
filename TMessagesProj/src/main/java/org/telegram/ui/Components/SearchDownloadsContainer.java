@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DefaultItemAnimator;
@@ -20,6 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AccountInstance;
+import org.telegram.messenger.CallNetworkPriorityController;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.FileLoader;
@@ -166,7 +168,9 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
                     AndroidUtilities.openDocument(message, parentActivity, parentFragment);
                 } else if (!cell.isLoading()) {
                     messageObject.putInDownloadsStore = true;
-                    AccountInstance.getInstance(UserConfig.selectedAccount).getFileLoader().loadFile(document, messageObject, FileLoader.PRIORITY_LOW, 0);
+                    int requestPriority = CallNetworkPriorityController.getInstance(currentAccount)
+                            .getRequestedPriority(messageObject, FileLoader.PRIORITY_LOW);
+                    AccountInstance.getInstance(UserConfig.selectedAccount).getFileLoader().loadFile(document, messageObject, requestPriority, 0);
                     cell.updateFileExistIcon(true);
                     DownloadController.getInstance(currentAccount).updateFilesLoadingPriority();
                 } else {
@@ -577,6 +581,7 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
                         view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                         int oldId = view.sharedDocumentCell.getMessage() == null ? 0 : view.sharedDocumentCell.getMessage().getId();
                         view.sharedDocumentCell.setDocument(messageObject, true);
+                        view.updateCallPauseState(messageObject);
                         messageHashIdTmp.set(view.sharedDocumentCell.getMessage().getId(), view.sharedDocumentCell.getMessage().getDialogId());
                         view.sharedDocumentCell.setChecked(uiCallback.isSelected(messageHashIdTmp), oldId == messageObject.getId());
                         view.sharedDocumentCell.showReorderIcon(showReorder, oldId == messageObject.getId());
@@ -659,16 +664,38 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
         }
     }
 
-    private class Cell extends FrameLayout {
-
+        private class Cell extends FrameLayout {
         SharedDocumentCell sharedDocumentCell;
-
+        private final TextView callPauseStatus;
         public Cell(@NonNull Context context) {
             super(context);
             sharedDocumentCell = new SharedDocumentCell(context, SharedDocumentCell.VIEW_TYPE_GLOBAL_SEARCH);
             sharedDocumentCell.rightDateTextView.setVisibility(View.GONE);
-            addView(sharedDocumentCell);
+            addView(sharedDocumentCell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+            callPauseStatus = new TextView(context);
+            callPauseStatus.setTextSize(12);
+            callPauseStatus.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            callPauseStatus.setSingleLine(true);
+            callPauseStatus.setPadding(AndroidUtilities.dp(16), 0, AndroidUtilities.dp(16), AndroidUtilities.dp(4));
+            callPauseStatus.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            callPauseStatus.setVisibility(View.GONE);
+            addView(callPauseStatus, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 28, android.view.Gravity.BOTTOM));
         }
+
+        void updateCallPauseState(MessageObject messageObject) {
+            boolean paused = CallNetworkPriorityController.getInstance(currentAccount).isPausedDuringCall(messageObject);
+            callPauseStatus.setVisibility(paused ? View.VISIBLE : View.GONE);
+            if (paused) {
+                callPauseStatus.setText(LocaleController.getString(R.string.PausedDuringCall) + "   " + LocaleController.getString(R.string.Resume));
+                callPauseStatus.setOnClickListener(v -> {
+                    CallNetworkPriorityController.getInstance(currentAccount).resume(messageObject);
+                    update(true);
+                });
+            } else {
+                callPauseStatus.setOnClickListener(null);
+            }
+        }
+
 
         @Override
         public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {

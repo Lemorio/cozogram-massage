@@ -343,6 +343,7 @@ public class DownloadController extends BaseController implements NotificationCe
             ApplicationLoader.applicationContext.registerReceiver(networkStateReceiver, filter);
         }
 
+        CallNetworkPriorityController.getInstance(currentAccount);
         if (getUserConfig().isClientActivated()) {
             checkAutodownloadSettings();
         }
@@ -607,6 +608,9 @@ public class DownloadController extends BaseController implements NotificationCe
     }
 
     public boolean canDownloadMedia(MessageObject messageObject) {
+        if (CallNetworkPriorityController.getInstance(currentAccount).shouldDeferAutomatic(messageObject)) {
+            return false;
+        }
         if (messageObject.type == MessageObject.TYPE_STORY) {
             if (!SharedConfig.isAutoplayVideo()) return false;
             TLRPC.TL_messageMediaStory mediaStory = (TLRPC.TL_messageMediaStory) MessageObject.getMedia(messageObject);
@@ -650,6 +654,9 @@ public class DownloadController extends BaseController implements NotificationCe
     }
 
     public int canDownloadMediaType(MessageObject messageObject) {
+        if (CallNetworkPriorityController.getInstance(currentAccount).shouldDeferAutomatic(messageObject)) {
+            return 0;
+        }
         if (messageObject.type == MessageObject.TYPE_STORY) {
             if (!SharedConfig.isAutoplayVideo()) return 0;
             TLRPC.TL_messageMediaStory mediaStory = (TLRPC.TL_messageMediaStory) MessageObject.getMedia(messageObject);
@@ -668,6 +675,9 @@ public class DownloadController extends BaseController implements NotificationCe
     }
 
     public int canDownloadMediaType(MessageObject messageObject, long overrideSize) {
+        if (CallNetworkPriorityController.getInstance(currentAccount).shouldDeferAutomatic(messageObject)) {
+            return 0;
+        }
         if (messageObject.type == MessageObject.TYPE_STORY) {
             if (!SharedConfig.isAutoplayVideo()) return 0;
             TLRPC.TL_messageMediaStory mediaStory = (TLRPC.TL_messageMediaStory) MessageObject.getMedia(messageObject);
@@ -859,6 +869,9 @@ public class DownloadController extends BaseController implements NotificationCe
     }
 
     public int canDownloadMedia(TLRPC.Message message) {
+        if (CallNetworkPriorityController.getInstance(currentAccount).shouldDeferAutomatic(message)) {
+            return 0;
+        }
         if (message == null || message.media instanceof TLRPC.TL_messageMediaStory) {
             return canPreloadStories() ? 2 : 0;
         }

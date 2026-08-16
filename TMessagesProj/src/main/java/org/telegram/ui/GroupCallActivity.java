@@ -269,6 +269,7 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
     private final VoIPToggleButton leaveButton;
     private final VoIPToggleButton messageButton;
     private final VoIPToggleButton muteButton;
+    private final VoIPToggleButton muteAllLocallyButton;
     private final RLottieImageView muteButtonIcon;
     private final ImageView expandOrMinimizeButton;
 
@@ -409,6 +410,8 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
     private GroupVoipInviteAlert groupVoipInviteAlert;
 
     private int muteButtonState = MUTE_BUTTON_STATE_UNMUTE;
+    private boolean allParticipantsMutedLocally;
+    private final LongSparseArray<Integer> localMuteAllSavedVolumes = new LongSparseArray<>();
     private boolean animatingToFullscreenExpand = false;
 
     private boolean startingGroupCall;
@@ -1282,12 +1285,14 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
                             } catch (Exception ignore) {}
                             if (DialogObject.isUserDialog(justJoinedId)) {
                                 TLRPC.User user = accountInstance.getMessagesController().getUser(justJoinedId);
-                                if (user != null && (call.call.participants_count < 250 || UserObject.isContact(user) || user.verified || hasInDialogs)) {
+                                if (user != null && (call.call.participants_count < 250 || UserObject.isContact(user) || user.verified || hasInDialogs)
+                                        && !accountInstance.getUserConfig().mg.hideJoinNotifications) {
                                     getUndoView().showWithAction(0, UndoView.ACTION_VOIP_USER_JOINED, user, currentChat, null, null);
                                 }
                             } else {
                                 TLRPC.Chat chat = accountInstance.getMessagesController().getChat(-justJoinedId);
-                                if (chat != null && (call.call.participants_count < 250 || !ChatObject.isNotInChat(chat) || chat.verified || hasInDialogs)) {
+                                if (chat != null && (call.call.participants_count < 250 || !ChatObject.isNotInChat(chat) || chat.verified || hasInDialogs)
+                                        && !accountInstance.getUserConfig().mg.hideJoinNotifications) {
                                     getUndoView().showWithAction(0, UndoView.ACTION_VOIP_USER_JOINED, chat, currentChat, null, null);
                                 }
                             }
@@ -4356,6 +4361,14 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
         cameraButton.setCrossOffset(-AndroidUtilities.dpf2(3.5f));
         cameraButton.setData(R.drawable.calls_video, Color.WHITE, 0, 1f, true, getString(R.string.VoipCamera), false, false);
 
+        muteAllLocallyButton = new VoIPToggleButton(context, 50f);
+        muteAllLocallyButton.setCheckable(true);
+        muteAllLocallyButton.setTextSize(12);
+        muteAllLocallyButton.showText(false, false);
+        muteAllLocallyButton.setData(R.drawable.filled_profile_mute_24, Color.WHITE, 0, 1f, true,
+                getString(R.string.MuteAllLocally), false, false);
+        muteAllLocallyButton.setOnClickListener(v -> toggleMuteAllLocally());
+        buttonsContainer.addButton(muteAllLocallyButton);
 
 
         flipButton = new VoIPToggleButton(context, 50f);
@@ -7108,6 +7121,63 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
     }
 
 
+    private void updateMuteAllLocallyButton() {
+        String label = allParticipantsMutedLocally
+                ? getString(R.string.RestoreParticipantsAudio)
+                : getString(R.string.MuteAllLocally);
+        int icon = allParticipantsMutedLocally ? R.drawable.filled_profile_unmute_24 : R.drawable.filled_profile_mute_24;
+        muteAllLocallyButton.setData(icon, Color.WHITE, 0, 1f, true, label, false, false);
+        muteAllLocallyButton.setChecked(allParticipantsMutedLocally, false);
+        muteAllLocallyButton.setContentDescription(label);
+    }
+
+    private void toggleMuteAllLocally() {
+        ChatObject.Call activeCall = call;
+        VoIPService service = VoIPService.getSharedInstance();
+        if (activeCall == null || service == null) {
+            return;
+        }
+        if (allParticipantsMutedLocally) {
+            for (int i = 0; i < activeCall.participants.size(); i++) {
+                TLRPC.GroupCallParticipant participant = activeCall.participants.valueAt(i);
+                if (participant == null || participant.self) {
+                    continue;
+                }
+                long participantId = MessageObject.getPeerId(participant.peer);
+                Integer savedVolume = localMuteAllSavedVolumes.get(participantId);
+                if (savedVolume != null) {
+                    participant.volume = savedVolume;
+                    participant.volume_by_admin = false;
+                    participant.flags |= 128;
+                    service.setParticipantVolume(participant, savedVolume);
+                }
+            }
+            localMuteAllSavedVolumes.clear();
+            allParticipantsMutedLocally = false;
+        } else {
+            localMuteAllSavedVolumes.clear();
+            for (int i = 0; i < activeCall.participants.size(); i++) {
+                TLRPC.GroupCallParticipant participant = activeCall.participants.valueAt(i);
+                if (participant == null || participant.self) {
+                    continue;
+                }
+                long participantId = MessageObject.getPeerId(participant.peer);
+                localMuteAllSavedVolumes.put(participantId, ChatObject.getParticipantVolume(participant));
+                participant.volume = 0;
+                participant.volume_by_admin = false;
+                participant.flags |= 128;
+                service.setParticipantVolume(participant, 0);
+            }
+            allParticipantsMutedLocally = true;
+            BulletinFactory.of(topBulletinContainer, new DarkBlueThemeResourcesProvider())
+                    .createSimpleBulletin(R.raw.chats_infotip, getString(R.string.AllParticipantsMutedLocally)).show();
+        }
+        updateMuteAllLocallyButton();
+        if (renderersContainer != null) {
+            renderersContainer.invalidate();
+        }
+    }
+
     private void updateButtonsVisibility(boolean animated) {
         if (call == null || call.isScheduled()) {
             buttonsContainer.setButtonVisibility(muteButton, switchToButtonProgress > 0.1f, animated);
@@ -7116,6 +7186,7 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
             buttonsContainer.setButtonVisibility(cameraButton, false, animated);
             buttonsContainer.setButtonVisibility(flipButton, false, animated);
             buttonsContainer.setButtonVisibility(speakerButton, false, animated);
+            buttonsContainer.setButtonVisibility(muteAllLocallyButton, false, animated);
             buttonsContainer.setButtonVisibility(messageButton, false, animated);
             return;
         }
@@ -7162,7 +7233,9 @@ public class GroupCallActivity extends BottomSheet implements NotificationCenter
         buttonsContainer.setButtonVisibility(flipButton, flipButtonVisible, animated);
         buttonsContainer.setButtonVisibility(soundButton, soundButtonVisible, animated);
         buttonsContainer.setButtonVisibility(speakerButton, speakerButtonVisible, animated);
+        buttonsContainer.setButtonVisibility(muteAllLocallyButton, true, animated);
         buttonsContainer.setButtonVisibility(messageButton, messageButtonVisible, animated);
+        updateMuteAllLocallyButton();
     }
 
 

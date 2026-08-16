@@ -14,16 +14,19 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.CallNetworkPriorityController;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UnifiedPushReceiver;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.RadioColorCell;
 import org.telegram.ui.Components.LayoutHelper;
@@ -82,6 +85,16 @@ public class MercurygramSettingsActivity extends UniversalFragment {
     private static final int ID_DISABLE_CLOUD_DRAFTS = 62;
     private static final int ID_CONFIRM_INTERNAL_LINKS = 63;
     private static final int ID_SHOW_CHAR_COUNTER = 64;
+    private static final int ID_QUICK_SAVE_SIDE_BUTTON = 65;
+    private static final int ID_QUICK_SAVE_DISPLAY_MODE = 66;
+    private static final int ID_QUICK_SAVE_PRESENTATION_MODE = 67;
+    private static final int ID_HIDE_JOIN_NOTIFICATIONS = 68;
+    private static final int ID_AUTO_REVEAL_SPOILERS = 69;
+    private static final int ID_ACTIVE_VIDEO_CHATS_TO_TOP = 70;
+    private static final int ID_MUTE_ALL_LOCALLY = 71;
+    private static final int ID_PRIORITIZE_NETWORK_DURING_CALL = 72;
+    private static final int ID_CALL_NETWORK_RESTRICTION_MODE = 73;
+    private static final int ID_MEDIA_DOWNLOADS = 74;
 
     @Override
     protected CharSequence getTitle() {
@@ -141,6 +154,23 @@ public class MercurygramSettingsActivity extends UniversalFragment {
                 .setChecked(getUserConfig().mg.deleteForAllByDefault));
         items.add(UItem.asShadow(LocaleController.getString(R.string.MercurygramDeleteForAllByDefaultAbout)));
 
+        items.add(UItem.asCheck(ID_QUICK_SAVE_SIDE_BUTTON,
+                        LocaleController.getString(R.string.QuickSaveSideButton))
+                .setChecked(getUserConfig().mg.quickSaveSideButtonEnabled));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.QuickSaveSideButtonAbout)));
+        items.add(UItem.asCheck(ID_HIDE_JOIN_NOTIFICATIONS,
+                        LocaleController.getString(R.string.HideJoinNotifications))
+                .setChecked(getUserConfig().mg.hideJoinNotifications));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.HideJoinNotificationsAbout)));
+        if (getUserConfig().mg.quickSaveSideButtonEnabled) {
+            items.add(UItem.asButton(ID_QUICK_SAVE_DISPLAY_MODE,
+                    LocaleController.getString(R.string.QuickSaveDisplayMode),
+                    quickSaveDisplayModeLabel()));
+            items.add(UItem.asButton(ID_QUICK_SAVE_PRESENTATION_MODE,
+                    LocaleController.getString(R.string.QuickSavePresentationMode),
+                    quickSavePresentationModeLabel()));
+        }
+
         items.add(UItem.asCheck(ID_SAVED_MESSAGES_HISTORY, LocaleController.getString(R.string.MercurygramSavedMessagesHistory))
                 .setChecked(getUserConfig().mg.savedMessagesHistory));
         if (getUserConfig().mg.savedMessagesHistory) {
@@ -148,7 +178,32 @@ public class MercurygramSettingsActivity extends UniversalFragment {
         }
         items.add(UItem.asShadow(LocaleController.getString(R.string.MercurygramSavedMessagesHistoryAbout)));
 
+        items.add(UItem.asCheck(ID_ACTIVE_VIDEO_CHATS_TO_TOP,
+                        LocaleController.getString(R.string.ActiveVideoChatsToTop))
+                .setChecked(getUserConfig().mg.activeVideoChatsToTop));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.ActiveVideoChatsToTopAbout)));
+
+        items.add(UItem.asHeader(LocaleController.getString(R.string.MercurygramSettingsCallNetwork)));
+        items.add(UItem.asCheck(ID_PRIORITIZE_NETWORK_DURING_CALL,
+                        LocaleController.getString(R.string.PrioritizeNetworkDuringCall))
+                .setChecked(getUserConfig().mg.prioritizeNetworkDuringCall));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.PrioritizeNetworkDuringCallAbout)));
+        items.add(UItem.asButton(ID_CALL_NETWORK_RESTRICTION_MODE,
+                        LocaleController.getString(R.string.CallNetworkAdvanced),
+                        LocaleController.getString(R.string.CallNetworkRestrictionMode) + ": " + callNetworkRestrictionModeLabel()));
+        items.add(UItem.asCheck(ID_MUTE_ALL_LOCALLY,
+                        LocaleController.getString(R.string.MuteAllLocally))
+                .setChecked(getUserConfig().mg.muteAllLocally));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.MuteAllLocallyAbout)));
+        items.add(UItem.asButton(ID_MEDIA_DOWNLOADS,
+                        LocaleController.getString(R.string.MediaDownloads),
+                        LocaleController.getString(R.string.MediaDownloadsAbout)));
+
         items.add(UItem.asHeader(LocaleController.getString(R.string.MercurygramSettingsMedia)));
+        items.add(UItem.asCheck(ID_AUTO_REVEAL_SPOILERS,
+                        LocaleController.getString(R.string.AutoRevealSpoilers))
+                .setChecked(getUserConfig().mg.autoRevealSpoilers));
+        items.add(UItem.asShadow(LocaleController.getString(R.string.AutoRevealSpoilersAbout)));
         items.add(UItem.asCheck(ID_SEND_LARGE_PHOTOS, LocaleController.getString(R.string.SendLargePhotos))
                 .setChecked(getUserConfig().mg.sendLargePhotos));
         items.add(UItem.asCheck(ID_REAR_ROUND_VIDEOS, LocaleController.getString(R.string.RearRoundVideos))
@@ -378,6 +433,31 @@ public class MercurygramSettingsActivity extends UniversalFragment {
                 getUserConfig().saveConfig(false);
                 refreshList();
                 break;
+            case ID_QUICK_SAVE_SIDE_BUTTON:
+                getUserConfig().mg.quickSaveSideButtonEnabled = !getUserConfig().mg.quickSaveSideButtonEnabled;
+                getUserConfig().saveConfig(false);
+                if (getUserConfig().mg.quickSaveSideButtonEnabled
+                        && getUserConfig().mg.quickSavePresentationMode == 0
+                        && !MessagesController.getGlobalMainSettings().getBoolean("quick_save_forward_hint_shown", false)) {
+                    MessagesController.getGlobalMainSettings().edit().putBoolean("quick_save_forward_hint_shown", true).apply();
+                    BulletinFactory.of(this).createSimpleBulletin(
+                            R.raw.chats_infotip,
+                            LocaleController.getString(R.string.QuickSaveForwardHint)
+                    ).show();
+                }
+                refreshList();
+                break;
+            case ID_HIDE_JOIN_NOTIFICATIONS:
+                getUserConfig().mg.hideJoinNotifications = !getUserConfig().mg.hideJoinNotifications;
+                getUserConfig().saveConfig(false);
+                refreshList();
+                break;
+            case ID_QUICK_SAVE_DISPLAY_MODE:
+                showQuickSaveDisplayModeDialog();
+                break;
+            case ID_QUICK_SAVE_PRESENTATION_MODE:
+                showQuickSavePresentationModeDialog();
+                break;
             case ID_SAVED_MESSAGES_HISTORY:
                 getUserConfig().mg.savedMessagesHistory = !getUserConfig().mg.savedMessagesHistory;
                 getUserConfig().saveConfig(false);
@@ -385,6 +465,35 @@ public class MercurygramSettingsActivity extends UniversalFragment {
                 break;
             case ID_CLEAR_SAVED_HISTORY:
                 confirmClearSavedHistory();
+                break;
+            case ID_AUTO_REVEAL_SPOILERS:
+                getUserConfig().mg.autoRevealSpoilers = !getUserConfig().mg.autoRevealSpoilers;
+                getUserConfig().saveConfig(false);
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.reloadInterface);
+                refreshList();
+                break;
+            case ID_ACTIVE_VIDEO_CHATS_TO_TOP:
+                getUserConfig().mg.activeVideoChatsToTop = !getUserConfig().mg.activeVideoChatsToTop;
+                getUserConfig().saveConfig(false);
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.dialogsNeedReload, true);
+                refreshList();
+                break;
+            case ID_PRIORITIZE_NETWORK_DURING_CALL:
+                getUserConfig().mg.prioritizeNetworkDuringCall = !getUserConfig().mg.prioritizeNetworkDuringCall;
+                getUserConfig().saveConfig(false);
+                CallNetworkPriorityController.getInstance(currentAccount).notifyPolicyChanged();
+                refreshList();
+                break;
+            case ID_CALL_NETWORK_RESTRICTION_MODE:
+                showCallNetworkRestrictionModeDialog();
+                break;
+            case ID_MUTE_ALL_LOCALLY:
+                getUserConfig().mg.muteAllLocally = !getUserConfig().mg.muteAllLocally;
+                getUserConfig().saveConfig(false);
+                refreshList();
+                break;
+            case ID_MEDIA_DOWNLOADS:
+                presentFragment(new MediaDownloadSettingsActivity());
                 break;
             case ID_SEND_LARGE_PHOTOS:
                 getUserConfig().mg.sendLargePhotos = !getUserConfig().mg.sendLargePhotos;
@@ -508,6 +617,104 @@ public class MercurygramSettingsActivity extends UniversalFragment {
                 presentFragment(new MercurygramEmojiSettingsActivity());
                 break;
         }
+    }
+
+    private String quickSaveDisplayModeLabel() {
+        switch (getUserConfig().mg.quickSaveSideButtonMode) {
+            case 1: return LocaleController.getString(R.string.QuickSaveDisplayAlways);
+            case 2: return LocaleController.getString(R.string.QuickSaveDisplayMediaOnly);
+            default: return LocaleController.getString(R.string.QuickSaveDisplayInteraction);
+        }
+    }
+
+    private String quickSavePresentationModeLabel() {
+        // TODO: Re-enable the separate-button mode when its message-row renderer is implemented.
+        if (getUserConfig().mg.quickSavePresentationMode != 0) {
+            getUserConfig().mg.quickSavePresentationMode = 0;
+            getUserConfig().saveConfig(false);
+        }
+        return LocaleController.getString(R.string.QuickSavePresentationMerge);
+    }
+
+    private String callNetworkRestrictionModeLabel() {
+        switch (getUserConfig().mg.callNetworkRestrictionMode) {
+            case CallNetworkPriorityController.MODE_STRICT:
+                return LocaleController.getString(R.string.CallNetworkRestrictionStrict);
+            case CallNetworkPriorityController.MODE_OFF:
+                return LocaleController.getString(R.string.CallNetworkRestrictionOff);
+            default:
+                return LocaleController.getString(R.string.CallNetworkRestrictionBalanced);
+        }
+    }
+
+    private void showCallNetworkRestrictionModeDialog() {
+        final String[] labels = {
+                LocaleController.getString(R.string.CallNetworkRestrictionBalanced),
+                LocaleController.getString(R.string.CallNetworkRestrictionStrict),
+                LocaleController.getString(R.string.CallNetworkRestrictionOff)
+        };
+        final Dialog[] dialogRef = new Dialog[1];
+        LinearLayout layout = new LinearLayout(getContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        for (int i = 0; i < labels.length; i++) {
+            final int mode = i;
+            RadioColorCell cell = new RadioColorCell(getContext());
+            cell.setPadding(AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4), 0);
+            cell.setCheckColor(Theme.getColor(Theme.key_radioBackground), Theme.getColor(Theme.key_dialogRadioBackgroundChecked));
+            cell.setTextAndValue(labels[i], mode == getUserConfig().mg.callNetworkRestrictionMode);
+            cell.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ALL));
+            cell.setOnClickListener(v -> {
+                getUserConfig().mg.callNetworkRestrictionMode = mode;
+                getUserConfig().saveConfig(false);
+                CallNetworkPriorityController.getInstance(currentAccount).notifyPolicyChanged();
+                if (dialogRef[0] != null) dialogRef[0].dismiss();
+                refreshList();
+            });
+            layout.addView(cell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 50));
+        }
+        Dialog dialog = new AlertDialog.Builder(getContext())
+                .setTitle(LocaleController.getString(R.string.CallNetworkRestrictionMode))
+                .setView(layout)
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .create();
+        dialogRef[0] = dialog;
+        dialog.show();
+    }
+
+    private void showQuickSaveDisplayModeDialog() {
+        final String[] labels = {
+                LocaleController.getString(R.string.QuickSaveDisplayInteraction),
+                LocaleController.getString(R.string.QuickSaveDisplayAlways),
+                LocaleController.getString(R.string.QuickSaveDisplayMediaOnly)
+        };
+        LinearLayout layout = new LinearLayout(getContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        final Dialog[] dialogRef = new Dialog[1];
+        for (int i = 0; i < labels.length; i++) {
+            final int mode = i;
+            RadioColorCell cell = new RadioColorCell(getContext());
+            cell.setPadding(AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4), 0);
+            cell.setCheckColor(Theme.getColor(Theme.key_radioBackground), Theme.getColor(Theme.key_dialogRadioBackgroundChecked));
+            cell.setTextAndValue(labels[i], mode == getUserConfig().mg.quickSaveSideButtonMode);
+            cell.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ALL));
+            cell.setOnClickListener(v -> {
+                getUserConfig().mg.quickSaveSideButtonMode = mode;
+                getUserConfig().saveConfig(false);
+                if (dialogRef[0] != null) dialogRef[0].dismiss();
+                refreshList();
+            });
+            layout.addView(cell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 50));
+        }
+        Dialog dialog = new AlertDialog.Builder(getContext()).setTitle(LocaleController.getString(R.string.QuickSaveDisplayMode)).setView(layout).setNegativeButton(LocaleController.getString(R.string.Cancel), null).create();
+        dialogRef[0] = dialog;
+        dialog.show();
+    }
+
+    private void showQuickSavePresentationModeDialog() {
+        // TODO: Re-enable a second choice after the separate-button renderer exists.
+        getUserConfig().mg.quickSavePresentationMode = 0;
+        getUserConfig().saveConfig(false);
+        refreshList();
     }
 
     // Subtitle for the Custom-emoji-pack row: "Off" when disabled; the installed

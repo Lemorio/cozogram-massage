@@ -274,6 +274,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -2954,6 +2955,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (initialDialogsType == DIALOGS_TYPE_DEFAULT) {
             observersGroup.add(NotificationCenter.chatlistFolderUpdate);
             observersGroup.add(NotificationCenter.dialogTranslate);
+            observersGroup.add(NotificationCenter.groupCallUpdated);
         }
 
         loadDialogs(getAccountInstance());
@@ -10573,7 +10575,54 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @SuppressWarnings("unchecked")
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
-        if (id == NotificationCenter.dialogsNeedReload) {
+        if (id == NotificationCenter.groupCallUpdated) {
+            boolean becameActive = false;
+            int oldDialogPosition = -1;
+            long activeChatId = 0;
+            if (args.length > 0 && args[0] instanceof Long) {
+                activeChatId = (Long) args[0];
+                TLRPC.Chat chat = getMessagesController().getChat(activeChatId);
+                if (chat != null && chat.call_active && chat.call_not_empty) {
+                    becameActive = activeVideoChatStartTimes.get(activeChatId) == null;
+                    if (becameActive) {
+                        ArrayList<TLRPC.Dialog> normalDialogs = getMessagesController().getDialogs(folderId);
+                        if (normalDialogs != null) {
+                            for (int i = 0; i < normalDialogs.size(); i++) {
+                                if (normalDialogs.get(i).id == -activeChatId) {
+                                    oldDialogPosition = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (activeVideoChatStartTimes.get(activeChatId) == null) {
+                        activeVideoChatStartTimes.put(activeChatId, System.currentTimeMillis());
+                    }
+                } else {
+                    activeVideoChatStartTimes.remove(activeChatId);
+                }
+            }
+            if (viewPages != null && !dialogsListFrozen) {
+                for (ViewPage viewPage : viewPages) {
+                    reloadViewPageDialogs(viewPage, false);
+                }
+            }
+            if (becameActive && oldDialogPosition >= 0 && activeChatId != 0 && initialDialogsType == DIALOGS_TYPE_DEFAULT) {
+                ArrayList<TLRPC.Dialog> sortedDialogs = getDialogsArray(currentAccount, DIALOGS_TYPE_DEFAULT, folderId, false);
+                int newDialogPosition = -1;
+                for (int i = 0; i < sortedDialogs.size(); i++) {
+                    if (sortedDialogs.get(i).id == -activeChatId) {
+                        newDialogPosition = i;
+                        break;
+                    }
+                }
+                if (newDialogPosition >= 0 && oldDialogPosition - newDialogPosition > ACTIVE_VIDEO_SURPRISE_JUMP_THRESHOLD
+                        && BulletinFactory.canShowBulletin(this)) {
+                    BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip,
+                            LocaleController.getString(R.string.ActiveVideoChatMoved)).show();
+                }
+            }
+        } else if (id == NotificationCenter.dialogsNeedReload) {
             if (viewPages == null || dialogsListFrozen) {
                 return;
             }
@@ -11052,6 +11101,69 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     public static final int DIALOGS_TYPE_BOT_SELECT_VERIFY = 16;
 
     private ArrayList<TLRPC.Dialog> botShareDialogs;
+    private static final int ACTIVE_VIDEO_SURPRISE_JUMP_THRESHOLD = 5;
+    private final LongSparseArray<Long> activeVideoChatStartTimes = new LongSparseArray<>();
+
+    private boolean isActiveVideoChatDialog(MessagesController messagesController, TLRPC.Dialog dialog) {
+        if (dialog == null || dialog.id >= 0) {
+            return false;
+        }
+        TLRPC.Chat chat = messagesController.getChat(-dialog.id);
+        return chat != null && chat.call_active && chat.call_not_empty;
+    }
+
+    private long getActiveVideoCallStartTime(TLRPC.Dialog dialog) {
+        Long startTime = activeVideoChatStartTimes.get(dialog.id);
+        if (startTime == null) {
+            ChatObject.Call call = getMessagesController().getGroupCall(-dialog.id, false);
+            if (call != null && call.call != null && call.call.record_start_date > 0) {
+                // The API exposes record_start_date, not a general call-start field.
+                // It is the best server timestamp available for an already-active call.
+                startTime = call.call.record_start_date * 1000L;
+            } else {
+                // Known limitation: Telegram does not expose the original start time
+                // for an active, non-recording call in TLRPC.Chat/GroupCall. Keep a
+                // local fallback only when no server/existing-object timestamp exists.
+                startTime = System.currentTimeMillis();
+            }
+            activeVideoChatStartTimes.put(dialog.id, startTime);
+        }
+        return startTime;
+    }
+
+    private ArrayList<TLRPC.Dialog> applyActiveVideoChatSorting(int account, ArrayList<TLRPC.Dialog> source) {
+        if (source == null || !UserConfig.getInstance(account).mg.activeVideoChatsToTop) {
+            return source;
+        }
+        MessagesController messagesController = AccountInstance.getInstance(account).getMessagesController();
+        ArrayList<TLRPC.Dialog> sorted = new ArrayList<>(source);
+        Collections.sort(sorted, (first, second) -> {
+            boolean firstPinned = first != null && first.pinned;
+            boolean secondPinned = second != null && second.pinned;
+            if (firstPinned != secondPinned) {
+                return firstPinned ? -1 : 1;
+            }
+            boolean firstActive = isActiveVideoChatDialog(messagesController, first);
+            boolean secondActive = isActiveVideoChatDialog(messagesController, second);
+            if (firstActive != secondActive) {
+                return firstActive ? -1 : 1;
+            }
+            if (firstActive) {
+                long firstStart = getActiveVideoCallStartTime(first);
+                long secondStart = getActiveVideoCallStartTime(second);
+                if (firstStart != secondStart) {
+                    return Long.compare(secondStart, firstStart);
+                }
+            }
+            boolean firstUnread = first != null && (first.unread_count > 0 || first.unread_mark);
+            boolean secondUnread = second != null && (second.unread_count > 0 || second.unread_mark);
+            if (firstUnread != secondUnread) {
+                return firstUnread ? -1 : 1;
+            }
+            return 0;
+        });
+        return sorted;
+    }
 
     @NonNull
     public ArrayList<TLRPC.Dialog> getDialogsArray(int currentAccount, int dialogsType, int folderId, boolean frozen) {
@@ -11060,7 +11172,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         MessagesController messagesController = AccountInstance.getInstance(currentAccount).getMessagesController();
         if (dialogsType == DIALOGS_TYPE_DEFAULT) {
-            return messagesController.getDialogs(folderId);
+            return applyActiveVideoChatSorting(currentAccount, messagesController.getDialogs(folderId));
         } else if (dialogsType == DIALOGS_TYPE_WIDGET || dialogsType == DIALOGS_TYPE_IMPORT_HISTORY) {
             return messagesController.dialogsServerOnly;
         } else if (dialogsType == DIALOGS_TYPE_ADD_USERS_TO) {

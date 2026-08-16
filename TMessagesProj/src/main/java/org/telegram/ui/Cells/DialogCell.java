@@ -2625,6 +2625,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             drawMention = false;
         }
 
+        if (chat != null && isDialogCell && chat.call_active && chat.call_not_empty) {
+            // Section 8: active video chat replaces the normal last-message preview.
+            // When call_active becomes false, this branch is skipped and the normal
+            // preview is rebuilt on the next DialogCell update.
+            checkMessage = true;
+            messageNameString = null;
+            messageString = LocaleController.formatPluralString("LiveVideoChatParticipants", Math.max(0, chat.participants_count));
+        }
         if (checkMessage) {
             if (messageString == null) {
                 messageString = "";

@@ -127,6 +127,7 @@ import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MediaDownloadController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
@@ -651,6 +652,10 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
 
         default void didPressGroupImage(ChatMessageCell cell, ImageReceiver imageReceiver, TLRPC.MessageExtendedMedia media, float x, float y) {
+        }
+
+        default boolean didLongPressSideButton(ChatMessageCell cell) {
+            return false;
         }
 
         default void didPressSideButton(ChatMessageCell cell) {
@@ -6862,6 +6867,21 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 currentMessageObject.richLayout.detach(this);
             }
             currentMessageObject = messageObject;
+            if (UserConfig.getInstance(currentAccount).mg.autoRevealSpoilers) {
+                // Text spoiler entities are safe to reveal locally; this does not touch
+                // server-controlled sensitive-content restrictions.
+                messageObject.isSpoilersRevealed = true;
+                // Media is auto-revealed only when the sender explicitly marked the
+                // media as a spoiler. Never reveal hidden-sensitive, secret, TTL, or
+                // other blurred previews through this setting.
+                if (messageObject.messageOwner != null
+                        && messageObject.messageOwner.media != null
+                        && messageObject.messageOwner.media.spoiler
+                        && !messageObject.isHiddenSensitive()
+                        && !messageObject.needDrawBluredPreview()) {
+                    messageObject.isMediaSpoilersRevealed = true;
+                }
+            }
             currentMessagesGroup = groupedMessages;
             wasAllChats = isAllChats;
             lastTime = -2;
@@ -12345,6 +12365,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                     pressedSideButton != SIDE_BUTTON_SPONSORED_MORE &&
                     pressedSideButton != 3 && pressedSideButton != 2
                 ) {
+                    if (delegate.didLongPressSideButton(this)) {
+                        sideButtonPressed = false;
+                        pressedSideButton = 0;
+                        handled = true;
+                        return true;
+                    }
                     delegate.didQuickShareStart(this, lastTouchX, lastTouchY);
                     sideButtonPressed = false;
                     pressedSideButton = 0;
@@ -17817,6 +17843,17 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private void didPressButton(boolean animated, boolean video) {
+        if (!video && buttonState == 0 && currentMessageObject != null
+                && ((!MediaDownloadController.videoQualities(currentMessageObject).isEmpty())
+                || (currentMessageObject.isPhoto() && !MediaDownloadController.photoSizes(currentMessageObject).isEmpty()))) {
+            MediaDownloadController.chooseOrDownload(getContext(), currentMessageObject,
+                    (messageObject, videoQuality, photoSize) -> {
+                        MediaDownloadController.downloadSelected(messageObject, videoQuality, photoSize);
+                        messageObject.loadingCancelled = false;
+                        invalidate();
+                    });
+            return;
+        }
         if (delegate != null && currentMessageObject.isSensitive() && currentMessageObject.hasMediaSpoilers() && !currentMessageObject.needDrawBluredPreview() && !currentMessageObject.isMediaSpoilersRevealed) {
             delegate.didPressRevealSensitiveContent(this);
             return;

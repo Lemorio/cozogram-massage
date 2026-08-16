@@ -36,6 +36,28 @@ public class MgAccountConfig {
     public boolean disableCloudDrafts = false;
     public boolean confirmInternalLinks = false;
     public boolean showCharCounter = false;
+    public boolean quickSaveSideButtonEnabled = false;
+    public int quickSaveSideButtonMode = 0; // 0 interaction, 1 always, 2 media only
+    public int quickSavePresentationMode = 0; // 0 merge with Forward, 1 separate button
+    public boolean hideJoinNotifications = false;
+    public boolean autoRevealSpoilers = false;
+    public boolean activeVideoChatsToTop = true;
+    public boolean muteAllLocally = false;
+    public boolean prioritizeNetworkDuringCall = true;
+    public int callNetworkRestrictionMode = 0; // 0 Balanced, 1 Strict, 2 Off
+    // Media Download Control (section 17); UI behavior is introduced phase by phase.
+    public int customMediaDownloadMode = 0; // 0 Smart Ask, 1 selected, 2 original, 3 data saver, 4 manual only
+    public int customVideoQualityPreset = 1; // Balanced placeholder until variant picker phase
+    public int customPhotoQualityPreset = 1; // Balanced placeholder until variant picker phase
+    public int customAudioDownloadPolicy = 0;
+    public long customFileDownloadSizeLimit = 10L * 1024L * 1024L;
+    public boolean customAskBeforeLargeDownload = true;
+    public int customDownloadProfileMobile = 0;
+    public int customDownloadProfileWifi = 0;
+    public int customDownloadProfileRoaming = 0;
+    public boolean customDownloadAlbumAsGroup = false;
+    public boolean customKeepOriginalMedia = false;
+    public boolean customMediaAutoCleanup = true;
 
     /**
      * Whether {@code draftMessage} may go to the server. An empty draft carries no
@@ -89,6 +111,27 @@ public class MgAccountConfig {
         editor.putBoolean("disableCloudDrafts", disableCloudDrafts);
         editor.putBoolean("confirmInternalLinks", confirmInternalLinks);
         editor.putBoolean("showCharCounter", showCharCounter);
+        editor.putBoolean("quickSaveSideButtonEnabled", quickSaveSideButtonEnabled);
+        editor.putInt("quickSaveSideButtonMode", quickSaveSideButtonMode);
+        editor.putInt("quickSavePresentationMode", quickSavePresentationMode);
+        editor.putBoolean("hideJoinNotifications", hideJoinNotifications);
+        editor.putBoolean("autoRevealSpoilers", autoRevealSpoilers);
+        editor.putBoolean("activeVideoChatsToTop", activeVideoChatsToTop);
+        editor.putBoolean("muteAllLocally", muteAllLocally);
+        editor.putBoolean("prioritizeNetworkDuringCall", prioritizeNetworkDuringCall);
+        editor.putInt("callNetworkRestrictionMode", callNetworkRestrictionMode);
+        editor.putInt("custom_media_download_mode", customMediaDownloadMode);
+        editor.putInt("custom_video_quality_preset", customVideoQualityPreset);
+        editor.putInt("custom_photo_quality_preset", customPhotoQualityPreset);
+        editor.putInt("custom_audio_download_policy", customAudioDownloadPolicy);
+        editor.putLong("custom_file_download_size_limit", customFileDownloadSizeLimit);
+        editor.putBoolean("custom_ask_before_large_download", customAskBeforeLargeDownload);
+        editor.putInt("custom_download_profile_mobile", customDownloadProfileMobile);
+        editor.putInt("custom_download_profile_wifi", customDownloadProfileWifi);
+        editor.putInt("custom_download_profile_roaming", customDownloadProfileRoaming);
+        editor.putBoolean("custom_download_album_as_group", customDownloadAlbumAsGroup);
+        editor.putBoolean("custom_keep_original_media", customKeepOriginalMedia);
+        editor.putBoolean("custom_media_auto_cleanup", customMediaAutoCleanup);
         editor.putBoolean("mgReducedTrackingExhausted", mgReducedTrackingExhausted);
     }
 
@@ -115,6 +158,27 @@ public class MgAccountConfig {
         disableCloudDrafts = preferences.getBoolean("disableCloudDrafts", false);
         confirmInternalLinks = preferences.getBoolean("confirmInternalLinks", false);
         showCharCounter = preferences.getBoolean("showCharCounter", false);
+        quickSaveSideButtonEnabled = preferences.getBoolean("quickSaveSideButtonEnabled", false);
+        quickSaveSideButtonMode = preferences.getInt("quickSaveSideButtonMode", 0);
+        quickSavePresentationMode = preferences.getInt("quickSavePresentationMode", 0);
+        hideJoinNotifications = preferences.getBoolean("hideJoinNotifications", false);
+        autoRevealSpoilers = preferences.getBoolean("autoRevealSpoilers", false);
+        activeVideoChatsToTop = preferences.getBoolean("activeVideoChatsToTop", true);
+        muteAllLocally = preferences.getBoolean("muteAllLocally", false);
+        prioritizeNetworkDuringCall = preferences.getBoolean("prioritizeNetworkDuringCall", true);
+        callNetworkRestrictionMode = preferences.getInt("callNetworkRestrictionMode", 0);
+        customMediaDownloadMode = preferences.getInt("custom_media_download_mode", 0);
+        customVideoQualityPreset = preferences.getInt("custom_video_quality_preset", 1);
+        customPhotoQualityPreset = preferences.getInt("custom_photo_quality_preset", 1);
+        customAudioDownloadPolicy = preferences.getInt("custom_audio_download_policy", 0);
+        customFileDownloadSizeLimit = preferences.getLong("custom_file_download_size_limit", 10L * 1024L * 1024L);
+        customAskBeforeLargeDownload = preferences.getBoolean("custom_ask_before_large_download", true);
+        customDownloadProfileMobile = preferences.getInt("custom_download_profile_mobile", 0);
+        customDownloadProfileWifi = preferences.getInt("custom_download_profile_wifi", 0);
+        customDownloadProfileRoaming = preferences.getInt("custom_download_profile_roaming", 0);
+        customDownloadAlbumAsGroup = preferences.getBoolean("custom_download_album_as_group", false);
+        customKeepOriginalMedia = preferences.getBoolean("custom_keep_original_media", false);
+        customMediaAutoCleanup = preferences.getBoolean("custom_media_auto_cleanup", true);
         mgReducedTrackingExhausted = preferences.getBoolean("mgReducedTrackingExhausted", false);
     }
 
@@ -141,6 +205,27 @@ public class MgAccountConfig {
         disableCloudDrafts = false;
         confirmInternalLinks = false;
         showCharCounter = false;
+        quickSaveSideButtonEnabled = false;
+        quickSaveSideButtonMode = 0;
+        quickSavePresentationMode = 0;
+        hideJoinNotifications = false;
+        autoRevealSpoilers = false;
+        activeVideoChatsToTop = true;
+        muteAllLocally = false;
+        prioritizeNetworkDuringCall = true;
+        callNetworkRestrictionMode = 0;
+        customMediaDownloadMode = 0;
+        customVideoQualityPreset = 1;
+        customPhotoQualityPreset = 1;
+        customAudioDownloadPolicy = 0;
+        customFileDownloadSizeLimit = 10L * 1024L * 1024L;
+        customAskBeforeLargeDownload = true;
+        customDownloadProfileMobile = 0;
+        customDownloadProfileWifi = 0;
+        customDownloadProfileRoaming = 0;
+        customDownloadAlbumAsGroup = false;
+        customKeepOriginalMedia = false;
+        customMediaAutoCleanup = true;
         mgReducedTrackingExhausted = false;
     }
 }
