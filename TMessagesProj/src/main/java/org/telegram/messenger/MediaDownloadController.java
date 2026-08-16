@@ -77,7 +77,11 @@ public final class MediaDownloadController {
             if (messageObject.isVideo()) {
                 VideoPlayer.Quality quality = MediaQualityHelper.selectVideoQuality(
                         videoQualities(messageObject), qualities[i]);
-                detail = quality == null ? "not available" : quality.p() + "p · " + AndroidUtilities.formatFileSize(size);
+                int sourceHeight = quality == null ? 0 : quality.p();
+                int targetHeight = qualities[i] == MediaQualityHelper.ORIGINAL
+                        ? sourceHeight : Math.min(sourceHeight, MediaQualityHelper.getVideoTargetHeight(qualities[i]));
+                long localSize = estimateLocalVideoSize(quality, qualities[i], targetHeight);
+                detail = quality == null ? "not available" : targetHeight + "p · " + formatSize(localSize);
             } else {
                 TLRPC.PhotoSize photo = MediaQualityHelper.selectPhotoSize(photoSizes(messageObject), qualities[i]);
                 detail = photo == null ? "not available" : photo.w + "×" + photo.h + " · " + AndroidUtilities.formatFileSize(size);
@@ -90,11 +94,45 @@ public final class MediaDownloadController {
     private static long estimateSize(MessageObject messageObject, int quality) {
         if (messageObject.isVideo()) {
             VideoPlayer.Quality selected = MediaQualityHelper.selectVideoQuality(videoQualities(messageObject), quality);
-            VideoPlayer.VideoUri uri = selected == null ? null : selected.getDownloadUri();
-            return uri == null ? 0 : uri.size;
+            return estimateLocalVideoSize(selected, quality, selected == null ? 0 : selected.p());
         }
         TLRPC.PhotoSize selected = MediaQualityHelper.selectPhotoSize(photoSizes(messageObject), quality);
         return selected == null ? 0 : selected.size;
+    }
+
+    private static long estimateLocalVideoSize(VideoPlayer.Quality quality, int selectedQuality, int outputHeight) {
+        if (quality == null || quality.uris.isEmpty()) {
+            return 0;
+        }
+        VideoPlayer.VideoUri uri = quality.getDownloadUri();
+        if (uri == null) {
+            return 0;
+        }
+        if (selectedQuality == MediaQualityHelper.ORIGINAL) {
+            return uri.size;
+        }
+        double durationSeconds = uri.duration > 0 ? uri.duration : 0;
+        if (durationSeconds <= 0) {
+            return 0;
+        }
+        long videoBitrate;
+        switch (selectedQuality) {
+            case MediaQualityHelper.LOW:
+                videoBitrate = 700_000;
+                break;
+            case MediaQualityHelper.HIGH:
+                videoBitrate = 4_000_000;
+                break;
+            default:
+                videoBitrate = 1_800_000;
+                break;
+        }
+        long audioBitrate = 128_000;
+        return Math.max(1, Math.round(durationSeconds * (videoBitrate + audioBitrate) / 8.0));
+    }
+
+    private static String formatSize(long bytes) {
+        return bytes > 0 ? AndroidUtilities.formatFileSize(bytes) : "estimasi";
     }
 
     private static void selectQuality(MessageObject messageObject, int quality, Callback callback) {
