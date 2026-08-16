@@ -3,7 +3,9 @@ package it.belloworld.mercurygram.helpers;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.Utilities;
 
 import java.io.File;
@@ -19,6 +21,24 @@ public final class MediaQualityPipeline {
     private static final ConcurrentHashMap<String, Boolean> inFlight = new ConcurrentHashMap<>();
 
     private MediaQualityPipeline() {
+    }
+
+    public static void requestAfterDownload(int account, String fileName, boolean video, int quality, Callback callback) {
+        if (fileName == null || quality == MediaQualityHelper.ORIGINAL) {
+            return;
+        }
+        NotificationCenter.NotificationCenterDelegate observer = new NotificationCenter.NotificationCenterDelegate() {
+            @Override
+            public void didReceivedNotification(int id, int notificationAccount, Object... args) {
+                if (id != NotificationCenter.fileLoaded || args.length < 2 || !fileName.equals(args[0])) {
+                    return;
+                }
+                NotificationCenter.getInstance(account).removeObserver(this, NotificationCenter.fileLoaded);
+                File source = args[1] instanceof File ? (File) args[1] : null;
+                request(source, video, quality, callback);
+            }
+        };
+        NotificationCenter.getInstance(account).addObserver(observer, NotificationCenter.fileLoaded);
     }
 
     public static void request(File source, boolean video, int quality, Callback callback) {

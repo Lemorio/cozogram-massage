@@ -3,6 +3,7 @@ package org.telegram.messenger;
 import android.content.Context;
 
 import it.belloworld.mercurygram.helpers.MediaQualityHelper;
+import it.belloworld.mercurygram.helpers.MediaQualityPipeline;
 
 import org.telegram.ui.ActionBar.AlertDialog;
 
@@ -21,6 +22,10 @@ public final class MediaDownloadController {
         void onSelected(MessageObject messageObject, VideoPlayer.Quality videoQuality, TLRPC.PhotoSize photoSize);
     }
 
+    public interface QualityCallback {
+        void onSelected(MessageObject messageObject, VideoPlayer.Quality videoQuality, TLRPC.PhotoSize photoSize, int quality);
+    }
+
     private MediaDownloadController() {
     }
 
@@ -35,17 +40,26 @@ public final class MediaDownloadController {
     }
 
     /** Explicit long-press download: choose a one-shot quality override. */
-    public static void chooseAs(Context context, MessageObject messageObject, Callback callback) {
-        if (context == null || messageObject == null || callback == null
-                || (!messageObject.isVideo() && !messageObject.isPhoto())) {
-            selectGlobalQuality(messageObject, callback);
+    public static void chooseAs(Context context, MessageObject messageObject, QualityCallback callback) {
+        if (callback == null || messageObject == null) {
+            return;
+        }
+        if (context == null || (!messageObject.isVideo() && !messageObject.isPhoto())) {
+            if (messageObject.isVideo()) {
+                callback.onSelected(messageObject, MediaQualityHelper.selectVideoQuality(videoQualities(messageObject), MediaQualityHelper.getQuality()), null, MediaQualityHelper.getQuality());
+            } else if (messageObject.isPhoto()) {
+                callback.onSelected(messageObject, null, MediaQualityHelper.selectPhotoSize(photoSizes(messageObject), MediaQualityHelper.getQuality()), MediaQualityHelper.getQuality());
+            } else {
+                callback.onSelected(messageObject, null, null, MediaQualityHelper.getQuality());
+            }
             return;
         }
         String[] labels = buildQualityLabels(messageObject);
         new AlertDialog.Builder(context)
                 .setTitle(LocaleController.getString(R.string.MediaDownloadsDownloadMedia))
                 .setItems(labels, (dialog, which) -> {
-                    selectQuality(messageObject, which, callback);
+                    selectQuality(messageObject, which, (selectedMessage, videoQuality, photoSize) ->
+                            callback.onSelected(selectedMessage, videoQuality, photoSize, which));
                     dialog.dismiss();
                 })
                 .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
@@ -147,6 +161,10 @@ public final class MediaDownloadController {
     }
 
     public static void downloadSelected(MessageObject messageObject, VideoPlayer.Quality videoQuality, TLRPC.PhotoSize photoSize) {
+        downloadSelected(messageObject, videoQuality, photoSize, MediaQualityHelper.getQuality());
+    }
+
+    public static void downloadSelected(MessageObject messageObject, VideoPlayer.Quality videoQuality, TLRPC.PhotoSize photoSize, int quality) {
         if (messageObject == null) {
             return;
         }
@@ -154,6 +172,8 @@ public final class MediaDownloadController {
         if (videoQuality != null) {
             VideoPlayer.VideoUri uri = videoQuality.getDownloadUri();
             if (uri != null && uri.document != null) {
+                String fileName = FileLoader.getAttachFileName(uri.document);
+                MediaQualityPipeline.requestAfterDownload(messageObject.currentAccount, fileName, true, quality, null);
                 FileLoader.getInstance(messageObject.currentAccount).loadFile(
                         uri.document, messageObject, FileLoader.PRIORITY_NORMAL_UP, 0);
             }
@@ -163,6 +183,8 @@ public final class MediaDownloadController {
                     ? ((TLRPC.TL_messageMediaPhoto) media).photo : null;
             ImageLocation location = ImageLocation.getForPhoto(photoSize, photo);
             if (location != null) {
+                String fileName = FileLoader.getAttachFileName(photoSize);
+                MediaQualityPipeline.requestAfterDownload(messageObject.currentAccount, fileName, false, quality, null);
                 FileLoader.getInstance(messageObject.currentAccount).loadFile(
                         location, messageObject, null, FileLoader.PRIORITY_NORMAL_UP, 0);
             }

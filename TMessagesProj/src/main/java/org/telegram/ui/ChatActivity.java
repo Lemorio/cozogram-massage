@@ -33584,7 +33584,9 @@ public class ChatActivity extends BaseFragment implements
                     MediaDownloadController.Callback callback = (messageObject, videoQuality, photoSize) ->
                             MediaDownloadController.downloadSelected(messageObject, videoQuality, photoSize);
                     if (option == OPTION_DOWNLOAD_MEDIA_AS) {
-                        MediaDownloadController.chooseAs(getParentActivity(), selectedObject, callback);
+                        MediaDownloadController.chooseAs(getParentActivity(), selectedObject,
+                                (messageObject, videoQuality, photoSize, quality) ->
+                                        MediaDownloadController.downloadSelected(messageObject, videoQuality, photoSize, quality));
                     } else {
                         MediaDownloadController.chooseOrDownload(getParentActivity(), selectedObject, callback);
                     }
