@@ -4,6 +4,8 @@ import android.content.Context;
 
 import it.belloworld.mercurygram.helpers.MediaQualityHelper;
 
+import org.telegram.ui.ActionBar.AlertDialog;
+
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.Components.VideoPlayer;
 
@@ -32,9 +34,65 @@ public final class MediaDownloadController {
         selectGlobalQuality(messageObject, callback);
     }
 
-    /** Download-as now follows the same global policy; no second quality menu is shown. */
+    /** Explicit long-press download: choose a one-shot quality override. */
     public static void chooseAs(Context context, MessageObject messageObject, Callback callback) {
-        selectGlobalQuality(messageObject, callback);
+        if (context == null || messageObject == null || callback == null
+                || (!messageObject.isVideo() && !messageObject.isPhoto())) {
+            selectGlobalQuality(messageObject, callback);
+            return;
+        }
+        String[] labels = buildQualityLabels(messageObject);
+        new AlertDialog.Builder(context)
+                .setTitle(LocaleController.getString(R.string.MediaDownloadsDownloadMedia))
+                .setItems(labels, (dialog, which) -> {
+                    selectQuality(messageObject, which, callback);
+                    dialog.dismiss();
+                })
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                .show();
+    }
+
+    private static String[] buildQualityLabels(MessageObject messageObject) {
+        String[] labels = new String[4];
+        int[] qualities = {MediaQualityHelper.LOW, MediaQualityHelper.BALANCED,
+                MediaQualityHelper.HIGH, MediaQualityHelper.ORIGINAL};
+        String[] names = {"Low", "Balanced", "High", "Original"};
+        for (int i = 0; i < qualities.length; i++) {
+            long size = estimateSize(messageObject, qualities[i]);
+            String detail;
+            if (messageObject.isVideo()) {
+                VideoPlayer.Quality quality = MediaQualityHelper.selectVideoQuality(
+                        videoQualities(messageObject), qualities[i]);
+                detail = quality == null ? "not available" : quality.p() + "p · " + AndroidUtilities.formatFileSize(size);
+            } else {
+                TLRPC.PhotoSize photo = MediaQualityHelper.selectPhotoSize(photoSizes(messageObject), qualities[i]);
+                detail = photo == null ? "not available" : photo.w + "×" + photo.h + " · " + AndroidUtilities.formatFileSize(size);
+            }
+            labels[i] = names[i] + " · " + detail;
+        }
+        return labels;
+    }
+
+    private static long estimateSize(MessageObject messageObject, int quality) {
+        if (messageObject.isVideo()) {
+            VideoPlayer.Quality selected = MediaQualityHelper.selectVideoQuality(videoQualities(messageObject), quality);
+            VideoPlayer.VideoUri uri = selected == null ? null : selected.getDownloadUri();
+            return uri == null ? 0 : uri.size;
+        }
+        TLRPC.PhotoSize selected = MediaQualityHelper.selectPhotoSize(photoSizes(messageObject), quality);
+        return selected == null ? 0 : selected.size;
+    }
+
+    private static void selectQuality(MessageObject messageObject, int quality, Callback callback) {
+        if (messageObject.isVideo()) {
+            callback.onSelected(messageObject,
+                    MediaQualityHelper.selectVideoQuality(videoQualities(messageObject), quality), null);
+        } else if (messageObject.isPhoto()) {
+            callback.onSelected(messageObject, null,
+                    MediaQualityHelper.selectPhotoSize(photoSizes(messageObject), quality));
+        } else {
+            callback.onSelected(messageObject, null, null);
+        }
     }
 
     private static void selectGlobalQuality(MessageObject messageObject, Callback callback) {

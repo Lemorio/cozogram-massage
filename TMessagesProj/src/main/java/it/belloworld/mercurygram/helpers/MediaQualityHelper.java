@@ -150,11 +150,23 @@ public final class MediaQualityHelper {
         }
     }
 
+    public static File getProcessedPhotoFile(File source, int quality) {
+        if (source == null || !source.isFile() || clamp(quality) == ORIGINAL) {
+            return null;
+        }
+        return new File(source.getParentFile(), source.getName() + ".mgq" + clamp(quality) + ".jpg");
+    }
+
     public static File getProcessedVideoFile(File source, int quality) {
         if (source == null || !source.isFile() || clamp(quality) == ORIGINAL) {
             return null;
         }
         return new File(source.getParentFile(), source.getName() + ".mgq" + clamp(quality) + ".mp4");
+    }
+
+    public static boolean hasProcessedPhoto(File source, int quality) {
+        File processed = getProcessedPhotoFile(source, quality);
+        return processed != null && processed.isFile() && processed.length() > 0;
     }
 
     public static boolean hasProcessedVideo(File source, int quality) {
