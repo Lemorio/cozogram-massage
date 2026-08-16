@@ -100,6 +100,7 @@ import androidx.core.graphics.ColorUtils;
 import androidx.core.math.MathUtils;
 
 import it.belloworld.mercurygram.map.MgMapSnapshot;
+import it.belloworld.mercurygram.helpers.MediaQualityHelper;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
@@ -12806,7 +12807,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             if (!messageObject.needDrawBluredPreview()) {
                 updatePlayingMessageProgress();
                 String str;
-                str = String.format("%s", AndroidUtilities.formatFileSize(documentAttach.size));
+                str = String.format("%s", AndroidUtilities.formatFileSize(getDisplayedMediaSize()));
                 docTitleWidth = (int) Math.ceil(Theme.chat_infoPaint.measureText(str));
                 docTitleLayout = new StaticLayout(str, Theme.chat_infoPaint, docTitleWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
             }
@@ -12921,6 +12922,40 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
             return width;
         }
+    }
+
+    private long getDisplayedMediaSize() {
+        if (documentAttach == null) {
+            return 0;
+        }
+        int quality = MediaQualityHelper.getQuality();
+        if (quality == MediaQualityHelper.ORIGINAL) {
+            return documentAttach.size;
+        }
+        File source = FileLoader.getInstance(currentAccount).getPathToAttach(documentAttach, null, false);
+        if (source != null && MediaQualityHelper.hasProcessedVideo(source, quality)) {
+            File processed = MediaQualityHelper.getProcessedVideoFile(source, quality);
+            if (processed != null && processed.length() > 0) {
+                return processed.length();
+            }
+        }
+        long durationSeconds = currentMessageObject == null ? 0 : Math.max(0L, Math.round(currentMessageObject.getDuration()));
+        if (durationSeconds <= 0) {
+            return documentAttach.size;
+        }
+        long bitrate;
+        switch (quality) {
+            case MediaQualityHelper.LOW:
+                bitrate = 828_000;
+                break;
+            case MediaQualityHelper.HIGH:
+                bitrate = 4_128_000;
+                break;
+            default:
+                bitrate = 1_928_000;
+                break;
+        }
+        return Math.max(1, Math.round(durationSeconds * bitrate / 8.0));
     }
 
     private void calcBackgroundWidth(int maxWidth, int timeMore, int maxChildWidth) {
