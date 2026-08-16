@@ -10695,7 +10695,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
             }
 
             if (videoUrises != null) {
-                videoPlayer.preparePlayer(videoUrises, VideoPlayer.getSavedQuality(videoUrises, currentMessageObject));
+                                        VideoPlayer.Quality globalQuality = MediaQualityHelper.selectVideoQuality(videoUrises, org.telegram.messenger.SharedConfig.mg_mediaQuality);
+                        videoPlayer.preparePlayer(videoUrises, globalQuality != null ? globalQuality : VideoPlayer.getSavedQuality(videoUrises, currentMessageObject));
+
             } else {
                 videoPlayer.preparePlayer(uri, "other", FileLoader.PRIORITY_HIGH, videoByteOffset);
             }

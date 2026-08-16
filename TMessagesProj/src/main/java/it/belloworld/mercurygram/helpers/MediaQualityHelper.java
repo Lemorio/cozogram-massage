@@ -3,6 +3,7 @@ package it.belloworld.mercurygram.helpers;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.Components.VideoPlayer;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -103,6 +104,37 @@ public final class MediaQualityHelper {
             }
         }
         return firstAtOrAbove != null ? firstAtOrAbove : (largestBelow != null ? largestBelow : largest);
+    }
+
+    public static VideoPlayer.Quality selectVideoQuality(ArrayList<VideoPlayer.Quality> qualities, int quality) {
+        if (qualities == null || qualities.isEmpty()) {
+            return null;
+        }
+        VideoPlayer.Quality largest = qualities.get(0);
+        for (VideoPlayer.Quality candidate : qualities) {
+            if (candidate != null && candidate.p() > largest.p()) {
+                largest = candidate;
+            }
+        }
+        if (clamp(quality) == ORIGINAL) {
+            return largest;
+        }
+        int target = getVideoTargetHeight(quality);
+        VideoPlayer.Quality bestAtOrBelow = null;
+        VideoPlayer.Quality smallestAbove = null;
+        for (VideoPlayer.Quality candidate : qualities) {
+            if (candidate == null || candidate.getDownloadUri() == null) {
+                continue;
+            }
+            int height = candidate.p();
+            if (height <= target && (bestAtOrBelow == null || height > bestAtOrBelow.p())) {
+                bestAtOrBelow = candidate;
+            }
+            if (height > target && (smallestAbove == null || height < smallestAbove.p())) {
+                smallestAbove = candidate;
+            }
+        }
+        return bestAtOrBelow != null ? bestAtOrBelow : (smallestAbove != null ? smallestAbove : largest);
     }
 
     public static int getPhotoTargetSize(int quality) {

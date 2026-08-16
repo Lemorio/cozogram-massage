@@ -17843,9 +17843,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private void didPressButton(boolean animated, boolean video) {
+        // Manual download is independent from the auto-download mask and quality-variant availability.
         if (!video && buttonState == 0 && currentMessageObject != null
-                && ((!MediaDownloadController.videoQualities(currentMessageObject).isEmpty())
-                || (currentMessageObject.isPhoto() && !MediaDownloadController.photoSizes(currentMessageObject).isEmpty()))) {
+                && (currentMessageObject.isVideo() || currentMessageObject.isPhoto())) {
             MediaDownloadController.chooseOrDownload(getContext(), currentMessageObject,
                     (messageObject, videoQuality, photoSize) -> {
                         MediaDownloadController.downloadSelected(messageObject, videoQuality, photoSize);
