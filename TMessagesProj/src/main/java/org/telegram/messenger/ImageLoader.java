@@ -47,6 +47,7 @@ import org.telegram.messenger.secretmedia.EncryptedFileInputStream;
 import org.telegram.messenger.utils.BitmapsCache;
 import org.telegram.messenger.wallpaper.WallpaperGiftBitmapDrawable;
 import it.belloworld.mercurygram.helpers.MediaQualityHelper;
+import it.belloworld.mercurygram.helpers.MediaQualityPipeline;
 import it.belloworld.mercurygram.helpers.MediaQualityTranscoder;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
@@ -2227,13 +2228,13 @@ public class ImageLoader {
                                     }
                                 }
                                 if (SaveToGallerySettingsHelper.needSave(flag, meta, messageObject, currentAccount)) {
-                                    if (messageObject != null && messageObject.isVideo()
-                                            && !MediaQualityTranscoder.isProcessedVideoFile(finalFile)
+                                    if (messageObject != null && (messageObject.isVideo() || messageObject.isPhoto())
                                             && MediaQualityHelper.getQuality() != MediaQualityHelper.ORIGINAL) {
                                         final int selectedQuality = MediaQualityHelper.getQuality();
-                                        MediaQualityTranscoder.processAsync(finalFile, selectedQuality, (galleryFile, processed) ->
-                                                AndroidUtilities.runOnUIThread(() -> AndroidUtilities.addMediaToGallery(
-                                                        (galleryFile != null ? galleryFile : finalFile).toString())));
+                                        MediaQualityPipeline.request(finalFile, messageObject.isVideo(), selectedQuality,
+                                                (galleryFile, processed) -> AndroidUtilities.runOnUIThread(() ->
+                                                        AndroidUtilities.addMediaToGallery(
+                                                                (galleryFile != null ? galleryFile : finalFile).toString())));
                                     } else {
                                         AndroidUtilities.addMediaToGallery(finalFile.toString());
                                     }
