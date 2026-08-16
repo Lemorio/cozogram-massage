@@ -8,6 +8,8 @@
 
 package org.telegram.messenger;
 
+import it.belloworld.mercurygram.helpers.MediaQualityHelper;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -1165,7 +1167,7 @@ public class DownloadController extends BaseController implements NotificationCe
                 path = FileLoader.getAttachFileName(document);
             } else if (downloadObject.object instanceof TLRPC.Photo) {
                 TLRPC.Photo photo = (TLRPC.Photo) downloadObject.object;
-                photoSize = FileLoader.getClosestPhotoSizeWithSize(photo.sizes, AndroidUtilities.getPhotoSize());
+                photoSize = MediaQualityHelper.selectPhotoSize(photo.sizes, SharedConfig.mg_mediaQuality);
                 path = FileLoader.getAttachFileName(photoSize);
             } else {
                 path = null;
